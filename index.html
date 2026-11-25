@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Endless Archipelago</title>
+  <style>
+    :root { --glass: rgba(10, 32, 52, 0.46); --glass2: rgba(8, 24, 40, 0.88); --line: rgba(255, 255, 255, 0.16); --ink: #f3fbff; --gold: #ffd98a; --teal: #8dfce0; --muted: rgba(243, 251, 255, 0.68); }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0b2238; color: var(--ink);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-user-select: none; user-select: none; }
+    #game { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
+    #game:active { cursor: grabbing; }
+    button { font: inherit; color: inherit; }
+    kbd { font: inherit; font-weight: 650; font-size: 0.92em; padding: 1px 6px; border-radius: 5px; background: rgba(255, 255, 255, 0.16); margin: 0 1px; }
+
+    .panel { background: var(--glass); border: 1px solid var(--line); border-radius: 14px;
+      backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); box-shadow: 0 8px 30px rgba(0, 20, 40, 0.25); }
+    #hud { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.2s ease; }
+    #hud.on { opacity: 1; }
+    #hud.photo > *:not(#photobar) { opacity: 0 !important; pointer-events: none !important; }
+    .click { pointer-events: auto; cursor: pointer; }
+
+    /* ---- top-left stats ---- */
+    #stats { position: absolute; top: 16px; left: 16px; padding: 12px 16px; width: 236px; }
+    #rank { font-family: Georgia, "Times New Roman", serif; font-size: 18px; color: var(--gold); display: flex; justify-content: space-between; align-items: baseline; }
+    #pearls { font-family: system-ui, sans-serif; font-size: 14px; color: #e9f6ff; font-weight: 650; }
+    #pearls::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px;
+      background: radial-gradient(circle at 35% 35%, #fff, #cfe9ff 45%, #8fb6d6); box-shadow: 0 0 6px rgba(200, 230, 255, 0.8); }
+    #stats .row { display: flex; gap: 14px; margin-top: 8px; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+    #stats .row b { font-size: 16px; font-weight: 650; margin-right: 3px; }
+    .dim { color: var(--muted); }
+    #bar { height: 3px; border-radius: 3px; background: rgba(255, 255, 255, 0.15); margin-top: 10px; overflow: hidden; }
+    #bar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width 0.8s ease; }
+    #bounties { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; }
+    #bounties h4 { margin: 0 0 6px; font-size: 10.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+    .bounty { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+    .bounty .chk { width: 14px; height: 14px; border-radius: 4px; border: 1.5px solid rgba(255,255,255,0.45); flex: none; display: grid; place-items: center; font-size: 10px; }
+    .bounty.done { color: var(--muted); text-decoration: line-through; }
+    .bounty.done .chk { background: var(--teal); border-color: var(--teal); color: #0b2238; }
+    .bounty .p { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); }
+
+    /* ---- top-centre score ---- */
+    #scorebox { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); text-align: center; }
+    #score { font-size: 34px; font-weight: 750; letter-spacing: 0.02em; font-variant-numeric: tabular-nums; text-shadow: 0 2px 16px rgba(0, 30, 60, 0.6); line-height: 1; transition: transform 0.12s; }
+    #score.bump { transform: scale(1.12); }
+    #timer { font-size: 12.5px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; text-shadow: 0 1px 8px rgba(0, 30, 60, 0.7); }
+    #combo { display: none; margin: 6px auto 0; padding: 3px 10px 5px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #1a1030; background: linear-gradient(90deg, #ffd98a, #ff9ad5); width: max-content; position: relative; overflow: hidden; }
+    #combo i { position: absolute; left: 0; bottom: 0; height: 2px; background: rgba(26, 16, 48, 0.55); }
+    #goal { display: none; margin: 8px auto 0; padding: 6px 12px; font-size: 12.5px; border-radius: 999px; width: max-content; }
+    #fuel { display: none; width: 180px; height: 6px; border-radius: 6px; background: rgba(255,255,255,0.15); margin: 6px auto 0; overflow: hidden; }
+    #fuel i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #ff8a3d, #ffd98a); transition: width 0.3s; }
+    #pops { position: absolute; top: 56px; left: 50%; width: 0; height: 0; }
+    .pop { position: absolute; left: 0; transform: translateX(-50%); white-space: nowrap; font-weight: 750; font-size: 15px; text-shadow: 0 2px 10px rgba(0, 20, 40, 0.7); animation: popup 1.4s ease-out forwards; }
+    @keyframes popup { from { opacity: 0; transform: translate(-50%, 6px) scale(0.8); } 15% { opacity: 1; transform: translate(-50%, 0) scale(1.08); } to { opacity: 0; transform: translate(-50%, -38px) scale(1); } }
+
+    /* ---- top-right ---- */
+    #side { position: absolute; top: 16px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+    #radarWrap { padding: 6px; border-radius: 50%; position: relative; }
+    #radar { width: 168px; height: 168px; border-radius: 50%; display: block; }
+    .hint { padding: 6px 12px; font-size: 12.5px; display: flex; align-items: center; gap: 8px; border-radius: 999px; }
+    .hint .arrow { display: inline-block; font-size: 13px; transition: transform 0.15s linear; }
+    #meta { display: flex; gap: 8px; }
+    #meta .panel { padding: 6px 12px; font-size: 12px; border-radius: 999px; }
+    #windbox { display: flex; align-items: center; gap: 10px; padding: 6px 12px 6px 6px; border-radius: 999px; font-size: 12px; }
+    #wind { width: 34px; height: 34px; display: block; }
+    #windLabel b { display: block; font-size: 12.5px; }
+
+    #speedo { position: absolute; left: 16px; bottom: 16px; padding: 9px 14px; font-size: 12px; display: flex; align-items: baseline; gap: 6px; }
+    #speedo b { font-size: 22px; font-variant-numeric: tabular-nums; min-width: 2ch; text-align: right; }
+    #boost { color: var(--teal); font-weight: 600; opacity: 0; transition: opacity 0.3s; }
+
+    #actions { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; gap: 6px; padding: 6px; border-radius: 16px; }
+    #actions button { pointer-events: auto; cursor: pointer; background: rgba(255, 255, 255, 0.08); border: 1px solid transparent; border-radius: 11px; padding: 7px 11px; font-size: 12.5px; display: flex; gap: 6px; align-items: center; transition: background 0.15s, border-color 0.15s, transform 0.1s; }
+    #actions button:hover { background: rgba(255, 255, 255, 0.18); border-color: var(--line); }
+    #actions button:active { transform: scale(0.96); }
+    #actions button.on { background: rgba(141, 252, 224, 0.22); border-color: rgba(141, 252, 224, 0.5); }
+    #actions .ic { font-size: 15px; line-height: 1; }
+    #keys { position: absolute; right: 16px; bottom: 16px; padding: 8px 14px; font-size: 11.5px; border-radius: 999px; color: var(--muted); }
+
+    /* ---- toasts / banner ---- */
+    #toasts { position: absolute; left: 50%; top: 104px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; width: min(92vw, 480px); }
+    .toast { padding: 11px 20px; text-align: center; animation: rise 0.6s cubic-bezier(.2, .9, .3, 1.2) both; transition: opacity 0.9s, transform 0.9s; border-left: 3px solid var(--accent, var(--gold)); }
+    .toast.out { opacity: 0; transform: translateY(-14px); }
+    .toast h3 { margin: 0; font-family: Georgia, serif; font-weight: 500; font-size: 18px; color: var(--accent, var(--gold)); }
+    .toast p { margin: 3px 0 0; font-size: 13px; color: var(--muted); line-height: 1.4; }
+    @keyframes rise { from { opacity: 0; transform: translateY(-18px) scale(0.96); } to { opacity: 1; transform: none; } }
+    #banner { position: fixed; left: 50%; top: 68%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; opacity: 0; }
+    #banner.show { animation: banner 4.2s ease forwards; }
+    #banner small { display: block; font-size: 12px; letter-spacing: 0.4em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+    #banner div { font-family: Georgia, serif; font-size: clamp(30px, 6vw, 56px); color: var(--bc, var(--gold)); text-shadow: 0 4px 40px var(--bc, rgba(255, 210, 120, 0.6)), 0 2px 12px rgba(0, 0, 0, 0.5); }
+    @keyframes banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); letter-spacing: 0.3em; } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1); letter-spacing: 0.02em; } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -60%); } }
+    #flash { position: fixed; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1.4s ease-out; }
+
+    /* ---- parchment note ---- */
+    #note { position: absolute; left: 16px; top: 50%; transform: translate(-120%, -50%); width: min(380px, calc(100vw - 32px)); padding: 22px 24px 20px; pointer-events: auto;
+      background: linear-gradient(160deg, #f6e8c3, #ead3a0); color: #3b2a14; border-radius: 6px 14px 8px 12px; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), inset 0 0 40px rgba(140, 90, 30, 0.25);
+      transition: transform 0.55s cubic-bezier(.2, .9, .3, 1.1); font-family: Georgia, "Times New Roman", serif; max-height: 80vh; overflow: auto; }
+    #note.show { transform: translate(0, -50%) rotate(-0.6deg); }
+    #note .kind { font-family: system-ui, sans-serif; font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; color: #8a5a22; display: flex; justify-content: space-between; }
+    #note h3 { margin: 6px 0 10px; font-weight: 500; font-size: 21px; }
+    #note .body { font-size: 16px; line-height: 1.55; white-space: pre-wrap; font-style: italic; }
+    #note .from { margin-top: 12px; text-align: right; font-size: 14px; color: #6b4a22; }
+    #note canvas { display: block; width: 100%; border-radius: 4px; margin-top: 12px; }
+    #note .reward { margin-top: 14px; font-family: system-ui, sans-serif; font-size: 12px; color: #6b4a22; display: flex; justify-content: space-between; align-items: center; }
+    #note .x { cursor: pointer; background: none; border: 0; color: #8a5a22; font-size: 12px; text-decoration: underline; }
+    #note .reveal { margin-top: 10px; background: rgba(90, 58, 24, 0.12); border: 1px dashed #8a5a22; border-radius: 6px; padding: 6px 10px; cursor: pointer; color: #5a3a18; font-family: Georgia, serif; font-style: italic; }
+
+    /* ---- fishing ---- */
+    #fishui { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); width: min(420px, 92vw); padding: 12px 16px 14px; text-align: center; display: none; }
+    #fishui.on { display: block; animation: riseC 0.4s both; }
+    @keyframes riseC { from { opacity: 0; transform: translate(-50%, 18px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    #fishStatus { font-size: 14px; font-weight: 600; }
+    #fishStatus.bite { color: #ffcf4d; font-size: 20px; animation: shake 0.25s infinite; }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+    #fishBar { position: relative; height: 16px; border-radius: 8px; background: rgba(255, 255, 255, 0.12); margin-top: 10px; display: none; overflow: hidden; }
+    #fishZone { position: absolute; top: 0; bottom: 0; background: rgba(125, 255, 138, 0.55); border-radius: 6px; box-shadow: 0 0 12px rgba(125, 255, 138, 0.6); }
+    #fishMarker { position: absolute; top: -2px; bottom: -2px; width: 4px; margin-left: -2px; background: #fff; border-radius: 2px; box-shadow: 0 0 8px #fff; }
+    #fishDots { margin-top: 8px; font-size: 13px; letter-spacing: 0.2em; display: none; }
+    #fishHelp { margin-top: 6px; font-size: 11.5px; color: var(--muted); }
+
+    /* ---- modal panels ---- */
+    #modal { position: fixed; inset: 0; display: none; place-items: center; background: rgba(4, 14, 26, 0.45); z-index: 20; padding: 16px; }
+    #modal.on { display: grid; animation: fade 0.25s both; }
+    @keyframes fade { from { opacity: 0; } }
+    .card { width: min(760px, 100%); max-height: min(86vh, 760px); display: flex; flex-direction: column; background: var(--glass2); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 30px 80px rgba(0, 0, 0, 0.5); overflow: hidden; }
+    .card header { display: flex; align-items: center; gap: 12px; padding: 16px 20px 0; }
+    .card header h2 { margin: 0; font-family: Georgia, serif; font-weight: 500; font-size: 24px; color: var(--gold); flex: 1; }
+    .card .close { background: rgba(255, 255, 255, 0.1); border: 0; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
+    .tabs { display: flex; gap: 4px; padding: 12px 20px 0; flex-wrap: wrap; }
+    .tabs button { background: none; border: 0; border-bottom: 2px solid transparent; padding: 8px 10px; cursor: pointer; color: var(--muted); font-size: 13.5px; }
+    .tabs button.on { color: var(--ink); border-color: var(--gold); }
+    .card .body { padding: 16px 20px 22px; overflow: auto; border-top: 1px solid var(--line); margin-top: -1px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+    .tile { background: rgba(255, 255, 255, 0.06); border: 1px solid var(--line); border-radius: 12px; padding: 12px; font-size: 13px; }
+    .tile h4 { margin: 0 0 4px; font-size: 14px; }
+    .tile.locked { opacity: 0.45; }
+    .tile .sub { color: var(--muted); font-size: 12px; line-height: 1.4; }
+    .tile .btn, .btn { margin-top: 10px; background: linear-gradient(#fff1c9, #ffd27a); color: #10283c; border: 0; border-radius: 999px; padding: 7px 14px; font-weight: 650; cursor: pointer; font-size: 12.5px; }
+    .btn.ghost { background: rgba(255, 255, 255, 0.12); color: var(--ink); }
+    .btn:disabled { opacity: 0.4; cursor: default; }
+    .pips { display: flex; gap: 4px; margin-top: 6px; }
+    .pips i { width: 18px; height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.18); }
+    .pips i.on { background: var(--teal); }
+    .swatch { display: flex; gap: 4px; margin-bottom: 8px; }
+    .swatch i { width: 22px; height: 22px; border-radius: 6px; border: 1px solid rgba(255, 255, 255, 0.25); }
+    .tile.equipped { border-color: var(--teal); box-shadow: 0 0 0 1px var(--teal) inset; }
+    .entry { padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; line-height: 1.5; }
+    .entry em { font-family: Georgia, serif; }
+    .entry .who { color: var(--muted); font-size: 12px; }
+    .stars { display: flex; gap: 8px; flex-wrap: wrap; margin: 6px 0 14px; }
+    .star { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); font-size: 12.5px; display: flex; gap: 8px; align-items: center; }
+    .star b { width: 10px; height: 10px; border-radius: 50%; background: var(--c); box-shadow: 0 0 10px var(--c); }
+    .star.off b { background: transparent; border: 1.5px solid var(--c); box-shadow: none; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+    th, td { text-align: left; padding: 7px 6px; border-bottom: 1px solid var(--line); }
+    th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.08em; }
+    .big { font-size: 52px; font-weight: 800; text-align: center; margin: 4px 0 0; font-variant-numeric: tabular-nums; }
+    .badge { display: block; width: max-content; margin: 8px auto; padding: 4px 12px; border-radius: 999px; background: linear-gradient(90deg, #ffd98a, #ff9ad5); color: #1a1030; font-weight: 700; font-size: 12.5px; }
+    .kv { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin: 14px 0; }
+    .kv div { background: rgba(255, 255, 255, 0.06); border-radius: 10px; padding: 10px 12px; }
+    .kv b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+    .kv span { font-size: 11.5px; color: var(--muted); }
+    .row-btns { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 12px; }
+    .fishdot { width: 26px; height: 14px; border-radius: 50% 40% 40% 50%; display: inline-block; vertical-align: middle; margin-right: 8px; background: var(--c); }
+    .rar { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
+
+
+    /* ---- catch reveal ---- */
+    #catch { position: fixed; inset: 0; display: none; place-items: center; z-index: 15; pointer-events: auto; cursor: pointer; background: radial-gradient(ellipse at center, rgba(4, 14, 26, 0.15), rgba(4, 14, 26, 0.55)); }
+    #catch.on { display: grid; animation: fade 0.3s both; }
+    .catch-card { position: relative; width: min(400px, 92vw); padding: 18px 20px 16px; text-align: center; border-radius: 22px; background: var(--glass2); border: 1px solid var(--line); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--rc) inset; animation: pop 0.5s cubic-bezier(.2, 1.4, .4, 1) both; overflow: hidden; }
+    @keyframes pop { from { transform: scale(0.6) translateY(30px); opacity: 0; } to { transform: none; opacity: 1; } }
+    .catch-stage { position: relative; height: 210px; margin: -4px -6px 4px; border-radius: 16px; overflow: hidden; background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--rc) 45%, transparent), transparent 65%), linear-gradient(#0d3350, #08243b); }
+    .catch-stage .rays { position: absolute; inset: -60%; background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--rc) 22%, transparent) 0deg 9deg, transparent 9deg 22deg); animation: spin 14s linear infinite; opacity: var(--rays, 0); }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .catch-stage canvas { position: relative; width: 100%; height: 100%; display: block; }
+    .catch-stage .spark { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 10px var(--rc), 0 0 4px #fff; animation: twinkle 1.6s ease-in-out infinite; opacity: 0; }
+    @keyframes twinkle { 50% { opacity: 1; transform: scale(1.4); } }
+    #catchNew { position: absolute; top: 14px; left: -34px; transform: rotate(-35deg); background: linear-gradient(90deg, #ff9ad5, #ffd98a); color: #1a1030; font-weight: 800; font-size: 12px; letter-spacing: 0.12em; padding: 4px 40px; z-index: 2; display: none; }
+    #catchRarity { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; color: var(--rc); margin-top: 8px; }
+    #catchName { margin: 4px 0 6px; font-family: Georgia, serif; font-weight: 500; font-size: 26px; }
+    #catchDesc { font-size: 13px; color: var(--muted); line-height: 1.45; font-style: italic; min-height: 38px; }
+    .ruler { margin: 12px auto 4px; width: 82%; height: 8px; border-radius: 8px; background: repeating-linear-gradient(90deg, rgba(255,255,255,0.25) 0 1px, transparent 1px 10%), rgba(255,255,255,0.08); overflow: hidden; }
+    .ruler i { display: block; height: 100%; background: linear-gradient(90deg, #8dfce0, var(--rc)); border-radius: 8px; transition: width 0.9s cubic-bezier(.2, .9, .3, 1); width: 0; }
+    #catchSize { font-size: 13px; font-variant-numeric: tabular-nums; }
+    #catchSize b { font-size: 20px; }
+    #catchReward { margin-top: 8px; font-size: 13px; color: var(--gold); font-weight: 650; }
+    .catch-card .hint2 { margin-top: 10px; font-size: 11.5px; color: var(--muted); }
+    .fthumb { height: 92px; margin: -4px -4px 8px; border-radius: 10px; background: radial-gradient(circle at 50% 55%, color-mix(in srgb, var(--g) 28%, transparent), transparent 70%), rgba(0, 20, 40, 0.35); display: grid; place-items: center; overflow: hidden; }
+    .fthumb img { max-width: 100%; max-height: 100%; }
+    .fthumb img.sil { filter: brightness(0) opacity(0.55); }
+    .fishtile h4 { margin-top: 2px; }
+    #fishZone img { position: absolute; left: 50%; top: 50%; height: 26px; transform: translate(-50%, -50%); filter: brightness(0) drop-shadow(0 0 3px rgba(125,255,138,0.9)); opacity: 0.7; }
+    #fishBar { height: 22px; overflow: visible; }
+
+    #photobar { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); padding: 8px 10px 8px 16px; border-radius: 999px; display: none; align-items: center; gap: 12px; font-size: 12.5px; pointer-events: auto; }
+    #hud.photo #photobar { display: flex; }
+
+    /* ---- intro ---- */
+    #intro { position: fixed; inset: 0; display: grid; place-items: center; text-align: center; padding: 24px; overflow: auto;
+      background: radial-gradient(ellipse at center, rgba(6, 24, 44, 0.2), rgba(6, 24, 44, 0.75)); transition: opacity 1s ease; z-index: 10; }
+    #intro.gone { opacity: 0; pointer-events: none; }
+    #intro h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; font-size: clamp(36px, 7.5vw, 80px); margin: 0; letter-spacing: 0.04em; text-shadow: 0 4px 30px rgba(0, 30, 60, 0.6); }
+    #intro h1 span { display: block; font-size: 0.26em; letter-spacing: 0.55em; text-transform: uppercase; opacity: 0.85; margin-bottom: 0.6em; padding-left: 0.55em; }
+    #intro p.tag { max-width: 480px; margin: 14px auto 22px; font-size: 15px; line-height: 1.6; opacity: 0.92; text-shadow: 0 1px 10px rgba(0, 20, 40, 0.7); }
+    #modes { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .mode { width: 220px; padding: 16px; text-align: left; border-radius: 16px; cursor: pointer; transition: transform 0.15s, border-color 0.15s, background 0.15s; }
+    .mode:hover { transform: translateY(-3px); border-color: rgba(255, 217, 138, 0.6); background: rgba(10, 32, 52, 0.62); }
+    .mode h3 { margin: 0 0 4px; font-family: Georgia, serif; font-weight: 500; font-size: 20px; color: var(--gold); }
+    .mode p { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.45; min-height: 54px; }
+    .mode .go { margin-top: 12px; display: inline-block; font-weight: 700; font-size: 13px; color: #10283c; background: linear-gradient(#fff1c9, #ffd27a); padding: 7px 16px; border-radius: 999px; }
+    .mode .best { display: block; margin-top: 8px; font-size: 11.5px; color: var(--teal); min-height: 14px; }
+    #seedRow { margin-top: 14px; font-size: 12.5px; color: var(--muted); display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; }
+    #seedRow input { width: 110px; background: rgba(255, 255, 255, 0.1); border: 1px solid var(--line); color: var(--ink); border-radius: 8px; padding: 5px 8px; font: inherit; }
+    #seedRow button { background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; font-size: 12px; }
+    #intro .controls { margin-top: 18px; font-size: 12.5px; opacity: 0.85; line-height: 2; }
+
+    @media (max-width: 1280px) { #keys { display: none; } }
+    @media (max-width: 900px) {
+      #actions .lbl { display: none; }
+      #toasts { top: auto; bottom: 74px; flex-direction: column-reverse; }
+    }
+    @media (max-width: 640px) {
+      #radar { width: 108px; height: 108px; }
+      #stats { width: 170px; padding: 10px 12px; }
+      #stats .row { gap: 8px; font-size: 11px; }
+      #bounties { display: none; }
+      #score { font-size: 26px; }
+      #scorebox { top: auto; bottom: 66px; }
+      #pops { top: auto; bottom: 120px; }
+      .hint { font-size: 11px; }
+      #windbox, #meta { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div id="stats" class="panel">
+      <div id="rank"><span id="rankName">Drifter</span><span id="pearls">0</span></div>
+      <div class="row">
+        <span><b id="shrines">0</b><span class="dim">shrines</span></span>
+        <span><b id="bottles">0</b><span class="dim">bottles</span></span>
+        <span><b id="leagues">0</b><span class="dim">leagues</span></span>
+      </div>
+      <div id="bar"><i></i></div>
+      <div id="bounties"></div>
+    </div>
+
+    <div id="scorebox">
+      <div id="score">0</div>
+      <div id="timer">0:00</div>
+      <div id="combo">Chain ×2<i></i></div>
+      <div id="goal" class="panel"></div>
+      <div id="fuel"><i></i></div>
+    </div>
+    <div id="pops"></div>
+
+    <div id="side">
+      <div id="radarWrap" class="panel"><canvas id="radar"></canvas></div>
+      <div id="hints"></div>
+      <div id="windbox" class="panel"><canvas id="wind" width="68" height="68"></canvas><span id="windLabel"><b>Beam reach</b><span class="dim">wind 100%</span></span></div>
+      <div id="meta"><span id="weatherName" class="panel">Clear skies</span><span id="clock" class="panel">Morning</span></div>
+    </div>
+
+    <div id="speedo" class="panel"><b id="speed">0</b> knots <span id="boost">· tailwind</span></div>
+
+    <div id="actions" class="panel">
+      <button data-act="fish" title="Fish (F)"><span class="ic">🎣</span><span class="lbl">Fish <kbd>F</kbd></span></button>
+      <button data-act="regatta" title="Regatta (R)"><span class="ic">🏁</span><span class="lbl">Regatta <kbd>R</kbd></span></button>
+      <button data-act="logbook" title="Logbook (L)"><span class="ic">📖</span><span class="lbl">Logbook <kbd>L</kbd></span></button>
+      <button data-act="shop" title="Shipwright (U)"><span class="ic">⚓</span><span class="lbl">Shipwright <kbd>U</kbd></span></button>
+      <button data-act="scores" title="Scorecard (Tab)"><span class="ic">🏆</span><span class="lbl">Scores <kbd>Tab</kbd></span></button>
+      <button data-act="photo" title="Photo mode (P)"><span class="ic">📷</span><span class="lbl">Photo <kbd>P</kbd></span></button>
+    </div>
+    <div id="keys" class="panel"><kbd>WASD</kbd> sail · drag look · <kbd>T</kbd> time · <kbd>G</kbd> graphics · <kbd>M</kbd> sound</div>
+
+    <div id="toasts"></div>
+
+    <div id="fishui" class="panel">
+      <div id="fishStatus">Waiting for a bite…</div>
+      <div id="fishBar"><div id="fishZone"></div><div id="fishMarker"></div></div>
+      <div id="fishDots"></div>
+      <div id="fishHelp">Press <kbd>F</kbd> or <kbd>Space</kbd> to reel in</div>
+    </div>
+
+    <div id="note"></div>
+
+    <div id="photobar" class="panel">Photo mode · drag to frame the shot
+      <button class="btn" id="snap">Capture</button><button class="btn ghost" id="photoExit">Exit <kbd>P</kbd></button>
+    </div>
+  </div>
+
+  <div id="catch"><div class="catch-card">
+    <div id="catchNew">NEW!</div>
+    <div class="catch-stage"><div class="rays"></div><canvas id="catchCanvas" width="400" height="230"></canvas></div>
+    <div id="catchRarity"></div>
+    <div id="catchName"></div>
+    <div id="catchDesc"></div>
+    <div class="ruler"><i id="catchRuler"></i></div>
+    <div id="catchSize"></div>
+    <div id="catchReward"></div>
+    <div class="hint2">click or press <kbd>F</kbd> to keep fishing</div>
+  </div></div>
+  <div id="banner"><small id="bannerSmall">Milestone</small><div id="bannerText"></div></div>
+  <div id="flash"></div>
+  <div id="modal"><div class="card"><header><h2 id="modalTitle"></h2><button class="close" id="modalClose">Close <kbd>Esc</kbd></button></header><div class="tabs" id="modalTabs"></div><div class="body" id="modalBody"></div></div></div>
+
+  <div id="intro">
+    <div>
+      <h1><span>The</span>Endless Archipelago</h1>
+      <p class="tag">A sea with no edge. Wake the sleeping shrines, read what the tide carries in, chase whales and ghost ships, and fish under strange stars.</p>
+      <div id="modes">
+        <div class="mode panel" data-mode="voyage"><h3>Voyage</h3><p>Free sailing in a sea that remembers you. Collect, upgrade, explore.</p><span class="go" id="voyageGo">Set sail</span><span class="best" id="bestVoyage"></span></div>
+        <div class="mode panel" data-mode="daily"><h3>Daily Voyage</h3><p>Everyone gets the same sea today. Wake 7 shrines as fast as you can.</p><span class="go">Race today’s sea</span><span class="best" id="bestDaily"></span></div>
+        <div class="mode panel" data-mode="lantern"><h3>Lantern Run</h3><p>An endless night. Your lantern burns down; every shrine refuels it. How far can you get?</p><span class="go">Light the lamp</span><span class="best" id="bestLantern"></span></div>
+      </div>
+      <div id="seedRow">Voyage sea <input id="seedInput" type="text" inputmode="numeric" maxlength="9" /> <button id="seedRandom">random sea</button> · <button id="freshWorld">reset this sea</button> · <button id="wipe">erase all progress</button></div>
+      <div class="controls">
+        <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> or arrows to sail · drag to look · scroll to zoom · gamepad works too<br />
+        sail across the wind for speed · <kbd>F</kbd> fish when slow · <kbd>R</kbd> regatta · <kbd>L</kbd> logbook · <kbd>U</kbd> shipwright · <kbd>P</kbd> photo
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
